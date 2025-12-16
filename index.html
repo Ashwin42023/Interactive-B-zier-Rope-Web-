@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Interactive Bézier Rope</title>
+<style>
+  body {
+    margin: 0;
+    background: #0d0d0d;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+class Vec2 {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  add(v) { return new Vec2(this.x + v.x, this.y + v.y); }
+  sub(v) { return new Vec2(this.x - v.x, this.y - v.y); }
+  mul(s) { return new Vec2(this.x * s, this.y * s); }
+
+  length() {
+    return Math.sqrt(this.x * this.x + this.y * this.y);
+  }
+
+  normalize() {
+    const len = this.length() || 1;
+    return new Vec2(this.x / len, this.y / len);
+  }
+}
+
+const P0 = new Vec2(100, canvas.height / 2);
+const P3 = new Vec2(canvas.width - 100, canvas.height / 2);
+
+let P1 = new Vec2(canvas.width / 3, canvas.height / 2);
+let P2 = new Vec2(canvas.width * 2 / 3, canvas.height / 2);
+
+let P1v = new Vec2(0, 0);
+let P2v = new Vec2(0, 0);
+
+let target1 = P1;
+let target2 = P2;
+
+const k = 0.02;
+const damping = 0.15;
+
+canvas.addEventListener("mousemove", e => {
+  const mx = e.clientX;
+  const my = e.clientY;
+
+  target1 = new Vec2(mx - 100, my);
+  target2 = new Vec2(mx + 100, my);
+});
+
+function bezierPoint(t) {
+  const u = 1 - t;
+
+  return P0.mul(u * u * u)
+    .add(P1.mul(3 * u * u * t))
+    .add(P2.mul(3 * u * t * t))
+    .add(P3.mul(t * t * t));
+}
+
+function bezierTangent(t) {
+  const u = 1 - t;
+
+  return P1.sub(P0).mul(3 * u * u)
+    .add(P2.sub(P1).mul(6 * u * t))
+    .add(P3.sub(P2).mul(3 * t * t));
+}
+
+function updatePhysics() {
+  let a1 = P1.sub(target1).mul(-k).sub(P1v.mul(damping));
+  P1v = P1v.add(a1);
+  P1 = P1.add(P1v);
+
+  let a2 = P2.sub(target2).mul(-k).sub(P2v.mul(damping));
+  P2v = P2v.add(a2);
+  P2 = P2.add(P2v);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "#00ffcc";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+
+  for (let t = 0; t <= 1; t += 0.01) {
+    const p = bezierPoint(t);
+    if (t === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = "#ffaa00";
+  ctx.lineWidth = 1;
+
+  for (let t = 0; t <= 1; t += 0.1) {
+    const p = bezierPoint(t);
+    const tan = bezierTangent(t).normalize().mul(30);
+
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + tan.x, p.y + tan.y);
+    ctx.stroke();
+  }
+
+  drawPoint(P0, "#ff5555");
+  drawPoint(P1, "#ffffff");
+  drawPoint(P2, "#ffffff");
+  drawPoint(P3, "#ff5555");
+}
+
+function drawPoint(p, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function animate() {
+  updatePhysics();
+  draw();
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+
+</body>
+</html>
